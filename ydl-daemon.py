@@ -5,10 +5,13 @@ import youtube_dl
 import threading
 import sqlite3
 from flask import Flask, jsonify, request
-import os, time, datetime
+import os
+import time
+import datetime
 import daemon
 
-DB_FILE='ydl-daemon.db'
+DB_FILE = 'ydl-daemon.db'
+
 
 def get_ydl_requests():
     conn = sqlite3.connect(DB_FILE)
@@ -28,6 +31,7 @@ def get_ydl_requests():
 
     return requests
 
+
 def get_ydl_items(status, off_peak):
 
     conn = sqlite3.connect(DB_FILE)
@@ -36,11 +40,13 @@ def get_ydl_items(status, off_peak):
 
     if off_peak:
         print("getting all items")
-        cur.execute("SELECT id, status, schedule FROM ydl_item WHERE status < ?", params)
+        cur.execute(
+            "SELECT id, status, schedule FROM ydl_item WHERE status < ?", params)
     else:
         print("getting anytime items")
-        cur.execute("SELECT id, status, schedule FROM ydl_item WHERE status < ? AND schedule = 1", params)
-        
+        cur.execute(
+            "SELECT id, status, schedule FROM ydl_item WHERE status < ? AND schedule = 1", params)
+
     rows = cur.fetchall()
 
     items = []
@@ -55,6 +61,7 @@ def get_ydl_items(status, off_peak):
 
     return items
 
+
 def queue_video(video, request):
     print('{id:\'%s\', title:\'%s\'}' % (video['id'], video['title']))
 
@@ -66,12 +73,14 @@ def queue_video(video, request):
     conn.commit()
     conn.close()
 
+
 def queue_video_list(videos, request):
     for video in videos:
         queue_video(video, request)
 
+
 def resolve_items(request):
-    
+
     ydl_opts = {
         'ignoreerrors': True,
         'quiet': True
@@ -88,7 +97,8 @@ def resolve_items(request):
         elif result.get('_type') == 'playlist':
             print("###playlist###")
             queue_video_list(result['entries'], request)
-    
+
+
 def queue_request(url, schedule):
     conn = sqlite3.connect(DB_FILE)
     print('url:%s, schedule:%d' % (url, schedule))
@@ -101,6 +111,7 @@ def queue_request(url, schedule):
     conn.commit()
     conn.close()
     return {'id': last_row_id, 'url': url, 'schedule': schedule}
+
 
 def run_web_server():
 
@@ -131,6 +142,7 @@ def run_web_server():
     if __name__ == '__main__':
         app.run(host='0.0.0.0', debug=False)
 
+
 def update_item_progress(filename, status, progress=0):
     id = os.path.splitext(filename)[0].split('-')[1]
     conn = sqlite3.connect(DB_FILE)
@@ -142,12 +154,13 @@ def update_item_progress(filename, status, progress=0):
     conn.commit()
     conn.close()
 
+
 def status_hook(d):
 
-    print('filename:%s, status:%s' %(d['filename'], d['status']))
+    print('filename:%s, status:%s' % (d['filename'], d['status']))
     if d['status'] == 'downloading':
         progress = d['downloaded_bytes']/d['total_bytes']*100
-        update_item_progress(d['filename'], 1, progress)        
+        update_item_progress(d['filename'], 1, progress)
         print(round(progress, 1), '%')
 
     elif d['status'] == 'finished':
@@ -161,11 +174,11 @@ def status_hook(d):
 
 
 def run_downloader():
-    
+
     print("starting the download server ...")
 
-    off_peak_start=datetime.time(0,0)
-    off_peak_end=datetime.time(8,0)
+    off_peak_start = datetime.time(0, 0)
+    off_peak_end = datetime.time(8, 0)
 
     print('off-peak start:', off_peak_start)
     print('off-peak end:', off_peak_end)
@@ -173,13 +186,13 @@ def run_downloader():
     while True:
 
         print(datetime.datetime.now().time())
-        
-        if datetime.datetime.now().time() > off_peak_start and datetime.datetime.now().time() < off_peak_end :
+
+        if datetime.datetime.now().time() > off_peak_start and datetime.datetime.now().time() < off_peak_end:
             off_peak = True
-            print ("running in the off peak mode")
+            print("running in the off peak mode")
         else:
             off_peak = False
-            print ("running in the peak mode")
+            print("running in the peak mode")
 
         items = get_ydl_items(3, off_peak)
 
@@ -192,8 +205,9 @@ def run_downloader():
 
             with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
-        
+
         time.sleep(60)
+
 
 try:
     downloader_thread = threading.Thread(target=run_downloader)
@@ -201,5 +215,5 @@ try:
 except:
     print('error starting the download server')
 
-#with daemon.DaemonContext:
+# with daemon.DaemonContext:
 run_web_server()
