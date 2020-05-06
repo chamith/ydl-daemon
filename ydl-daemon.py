@@ -5,6 +5,8 @@ import youtube_dl
 import threading
 import sqlite3
 from flask import Flask, jsonify, request
+import os, time, datetime
+import daemon
 
 DB_FILE='ydl-daemon.db'
 
@@ -26,10 +28,19 @@ def get_ydl_requests():
 
     return requests
 
-def get_ydl_items():
+def get_ydl_items(status, off_peak):
+
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
-    cur.execute("SELECT id, status, schedule FROM ydl_item")
+    params = (status,)
+
+    if off_peak:
+        print("getting all items")
+        cur.execute("SELECT id, status, schedule FROM ydl_item WHERE status < ?", params)
+    else:
+        print("getting anytime items")
+        cur.execute("SELECT id, status, schedule FROM ydl_item WHERE status < ? AND schedule = 1", params)
+        
     rows = cur.fetchall()
 
     items = []
@@ -106,25 +117,45 @@ def run_web_server():
     @app.route('/requests', methods=['POST'])
     def add_request():
         content = request.json
-        req = queue_request(content['url'], content['schedule'])
+        schedule = content.get('schedule', 0)
+
+        req = queue_request(content['url'], schedule)
         resolver_thread = threading.Thread(target=resolve_items, args=(req,))
         resolver_thread.start()
         return jsonify(req), 201
 
-    if __name__ == '__main__':
-        app.run(host='0.0.0.0', debug=True)
+    @app.route('/items', methods=['GET'])
+    def get_items():
+        return jsonify(get_ydl_items(4, True))
 
+    if __name__ == '__main__':
+        app.run(host='0.0.0.0', debug=False)
+
+def update_item_progress(filename, status, progress=0):
+    id = os.path.splitext(filename)[0].split('-')[1]
+    conn = sqlite3.connect(DB_FILE)
+    print('id:%s, status:%d, progress:%d' % (id, status, progress))
+    cur = conn.cursor()
+    params = (status, progress, id)
+    cur.execute(
+        "UPDATE ydl_item SET status=?, progress=? WHERE id=?", params)
+    conn.commit()
+    conn.close()
 
 def status_hook(d):
-    print(d)
+
+    print('filename:%s, status:%s' %(d['filename'], d['status']))
     if d['status'] == 'downloading':
-        print('in-progress')
         progress = d['downloaded_bytes']/d['total_bytes']*100
+        update_item_progress(d['filename'], 1, progress)        
         print(round(progress, 1), '%')
+
     elif d['status'] == 'finished':
-        print('complete')
+        update_item_progress(d['filename'], 3, 100)
+
     elif d['status'] == 'error':
-        print('error')
+        update_item_progress(d['filename'], -1)
+
     else:
         print('pending')
 
@@ -133,27 +164,42 @@ def run_downloader():
     
     print("starting the download server ...")
 
-    items = get_ydl_items()
+    off_peak_start=datetime.time(0,0)
+    off_peak_end=datetime.time(8,0)
 
+    print('off-peak start:', off_peak_start)
+    print('off-peak end:', off_peak_end)
 
+    while True:
 
-    ydl_opts = {
-        'progress_hooks': [status_hook]
-    }
+        print(datetime.datetime.now().time())
+        
+        if datetime.datetime.now().time() > off_peak_start and datetime.datetime.now().time() < off_peak_end :
+            off_peak = True
+            print ("running in the off peak mode")
+        else:
+            off_peak = False
+            print ("running in the peak mode")
 
-    for item in items:
-        url = "https://www.youtube.com/watch?v=" + item['id']
-        print(url)
-        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+        items = get_ydl_items(3, off_peak)
 
+        ydl_opts = {
+            'progress_hooks': [status_hook]
+        }
+
+        for item in items:
+            url = "https://www.youtube.com/watch?v=" + item['id']
+
+            with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+        
+        time.sleep(60)
 
 try:
-    #web_server_thread = threading.Thread(target=run_web_server)
-    # web_server_thread.start()
     downloader_thread = threading.Thread(target=run_downloader)
     downloader_thread.start()
 except:
-    print('error starting the web server')
+    print('error starting the download server')
 
+#with daemon.DaemonContext:
 run_web_server()
