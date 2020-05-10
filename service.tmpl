@@ -1,0 +1,16 @@
+# Contents of /etc/systemd/system/ydl-daemon.service
+[Unit]
+Description=youtube-dl daemon
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/var/lib/ydl-daemon
+ExecStart=/usr/local/bin/ydl-daemon.py
+SuccessExitStatus=143
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
