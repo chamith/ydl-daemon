@@ -12,6 +12,7 @@ mkdir $LIB_DIR
 cp $SCRIPT_DIR/service.tmpl $SVC_DIR/$SVC_NAME.service
 $SCRIPT_DIR/db_setup.py $LIB_DIR/$DB_NAME
 
+pip install -r $SCRIPT_DIR/requirements.txt
 systemctl daemon-reload
 systemctl enable $SVC_NAME.service
 systemctl start $SVC_NAME
