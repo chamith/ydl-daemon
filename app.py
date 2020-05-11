@@ -12,6 +12,7 @@ import sys
 
 DB_FILE = sys.argv[1]
 
+
 def get_ydl_requests():
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
@@ -31,20 +32,13 @@ def get_ydl_requests():
     return requests
 
 
-def get_ydl_items(status, off_peak):
+def get_ydl_items(status, schedule):
 
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
-    params = (status,)
+    params = (status, schedule)
 
-    if off_peak:
-        print("getting all items")
-        cur.execute(
-            "SELECT id, status, schedule FROM ydl_item WHERE status < ?", params)
-    else:
-        print("getting anytime items")
-        cur.execute(
-            "SELECT id, status, schedule FROM ydl_item WHERE status < ? AND schedule = 1", params)
+    cur.execute("SELECT id, status, schedule FROM ydl_item WHERE status <= ? AND schedule <= ?", params)
 
     rows = cur.fetchall()
 
@@ -136,7 +130,7 @@ def run_web_server():
 
     @app.route('/items', methods=['GET'])
     def get_items():
-        return jsonify(get_ydl_items(4, True))
+        return jsonify(get_ydl_items(3, 1))
 
     if __name__ == '__main__':
         app.run(host='0.0.0.0', debug=False)
@@ -176,26 +170,23 @@ def status_hook(d):
 
 def run_downloader():
 
-    print("starting the download server ...")
+    print("Starting the download server ...")
 
     off_peak_start = datetime.time(0, 0)
     off_peak_end = datetime.time(8, 0)
 
-    print('off-peak start:', off_peak_start)
-    print('off-peak end:', off_peak_end)
+    print("===== CONFIGS =====")
+    print('Download Directory: %s' %(os.getcwd()))
+    print('Off Peak Schedule: %s - %s' %(off_peak_start , off_peak_end))
+    print('===================')
 
     while True:
+        time_now = datetime.datetime.now().time()
+        schedule = off_peak_start < time_now and time_now < off_peak_end
+        # false (0): offpeak
+        # true  (1): anytime
 
-        print(datetime.datetime.now().time())
-
-        if datetime.datetime.now().time() > off_peak_start and datetime.datetime.now().time() < off_peak_end:
-            off_peak = True
-            print("running in the off peak mode")
-        else:
-            off_peak = False
-            print("running in the peak mode")
-
-        items = get_ydl_items(3, off_peak)
+        items = get_ydl_items(2, schedule)
 
         ydl_opts = {
             'progress_hooks': [status_hook]
