@@ -167,8 +167,12 @@ def run_web_server():
     def add_request():
         content = request.json
         schedule = content.get('schedule', 0)
+        url = content.get('url', None)
 
-        req = queue_request(content['url'], schedule)
+        if url is None:
+            return jsonify(''), 400
+
+        req = queue_request(url, schedule)
         resolver_thread = threading.Thread(target=resolve_items, args=(req,))
         resolver_thread.start()
         return jsonify(req), 201
