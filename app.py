@@ -143,7 +143,9 @@ def run_web_server():
 
 
 def update_item_progress(filename, status, progress=0):
-    id = os.path.splitext(filename)[0].split('-')[1]
+    filename_no_ext = os.path.splitext(filename)[0]
+    lst = filename_no_ext.split('-')
+    id = lst[len(lst)-1]
     conn = sqlite3.connect(DB_FILE)
     print('id:%s, status:%d, progress:%d' % (id, status, progress))
     cur = conn.cursor()
