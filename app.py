@@ -40,14 +40,14 @@ def get_ydl_items_by_request(request_id):
     cur = conn.cursor()
     params = (request_id,)
 
-    cur.execute("SELECT id, status, progress FROM ydl_item WHERE request_id = ?", params)
+    cur.execute("SELECT id, title, status, progress FROM ydl_item WHERE request_id = ?", params)
 
     rows = cur.fetchall()
 
     items = []
 
     for raw in rows:
-        item = {'id': raw[0], 'status': raw[1], 'progress': raw[2]}
+        item = {'id': raw[0], 'title': raw[1], 'status': raw[2], 'progress': raw[3]}
         items.append(item)
 
     cur.close()
@@ -137,9 +137,9 @@ def queue_request(url, schedule):
     conn = sqlite3.connect(DB_FILE)
     print('url:%s, schedule:%d' % (url, schedule))
     cur = conn.cursor()
-    params = (url, schedule, 0)
+    params = (url, schedule)
     cur.execute(
-        "INSERT INTO ydl_request(url, schedule, status) VALUES(?,?,?)", params)
+        "INSERT INTO ydl_request(url, schedule) VALUES(?,?)", params)
     last_row_id = cur.lastrowid
 
     conn.commit()
