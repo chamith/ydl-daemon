@@ -1,13 +1,13 @@
 #! /bin/bash
 
+SVC_NAME=youtube-dl-daemon
+SRC_NAME=app.py
 SCRIPT_DIR=$(dirname "$0")
 BIN_DIR=/usr/local/bin
-LIB_DIR=/var/lib/ydl-daemon
+LIB_DIR=/var/lib/$SVC_NAME
 SVC_DIR=/etc/systemd/system
-SVC_NAME=ydl-daemon
-DB_NAME=ydl-daemon.db
-
-BIN_FILE_TARGET=$BIN_DIR/ydl-daemon.py
+DB_NAME=$SVC_NAME.db
+BIN_FILE_TARGET=$BIN_DIR/$SVC_NAME
 DB_FILE_TARGET=$LIB_DIR/$DB_NAME
 
 if [ -z "$1" ]; then
@@ -18,11 +18,11 @@ fi
 DL_DIR=$1
 
 if [ -f "$BIN_FILE_TARGET" ]; then
-    echo "removing existing ydl-daemon.py"
+    echo "removing existing binary files"
     rm $BIN_FILE_TARGET
 fi
 
-cp $SCRIPT_DIR/ydl-daemon.py $BIN_FILE_TARGET
+cp $SCRIPT_DIR/$SRC_NAME $BIN_FILE_TARGET
 
 if [ ! -d "$LIB_DIR" ]; then
     echo "creating the lib directory"
