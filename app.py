@@ -1,36 +1,16 @@
 #! /usr/bin/python3
 
 from __future__ import unicode_literals
+from flask import Flask, jsonify, request
 import youtube_dl
 import threading
 import sqlite3
-from flask import Flask, jsonify, request
 import os
 import datetime
 import time
 import sys
 
 DB_FILE = sys.argv[1]
-
-
-def get_ydl_requests():
-    conn = sqlite3.connect(DB_FILE)
-    cur = conn.cursor()
-    cur.execute("SELECT url, status, schedule FROM ydl_request")
-    request_rows = cur.fetchall()
-
-    requests = []
-
-    for raw in request_rows:
-        request = {'url': raw[0], 'status': raw[1], 'schedule': raw[2]}
-        requests.append(request)
-        print(request)
-
-    cur.close()
-    conn.close()
-
-    return requests
-
 
 def get_ydl_items(status, schedule):
 
@@ -54,6 +34,61 @@ def get_ydl_items(status, schedule):
 
     return items
 
+def get_ydl_items_by_request(request_id):
+
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    params = (request_id,)
+
+    cur.execute("SELECT id, status, progress FROM ydl_item WHERE request_id = ?", params)
+
+    rows = cur.fetchall()
+
+    items = []
+
+    for raw in rows:
+        item = {'id': raw[0], 'status': raw[1], 'progress': raw[2]}
+        items.append(item)
+
+    cur.close()
+    conn.close()
+
+    return items
+
+def get_ydl_requests():
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    cur.execute("SELECT url, schedule, id FROM ydl_request")
+    request_rows = cur.fetchall()
+
+    requests = []
+
+    for raw in request_rows:
+        request = {'id': raw[2], 'url': raw[0], 'schedule': raw[1], 'items': get_ydl_items_by_request(raw[2])}
+        requests.append(request)
+        print(request)
+
+    cur.close()
+    conn.close()
+
+    return requests
+
+def get_ydl_request(id):
+    conn = sqlite3.connect(DB_FILE)
+    params = (id,)
+    cur = conn.cursor()
+    cur.execute("SELECT url, schedule, id FROM ydl_request WHERE id = ?", params)
+    raw = cur.fetchone()
+
+    request = {'url': raw[0], 'schedule': raw[1], 'items': get_ydl_items_by_request(raw[2])}
+    print(request)
+
+    cur.close()
+    conn.close()
+
+    return request
+
+
 
 def queue_video(video, request):
     print('{id:\'%s\', title:\'%s\'}' % (video['id'], video['title']))
@@ -61,9 +96,15 @@ def queue_video(video, request):
     conn = sqlite3.connect(DB_FILE)
     params = (video['id'], video['title'],
               request['schedule'], 0, 0, request['id'])
-    conn.execute(
-        "INSERT INTO ydl_item(id, title, schedule, status, progress, request_id) VALUES (?,?,?,?,?,?)", params)
-    conn.commit()
+
+    try:
+        with conn:
+            conn.execute(
+                "INSERT INTO ydl_item(id, title, schedule, status, progress, request_id) VALUES (?,?,?,?,?,?)", params)
+            conn.commit()
+    except sqlite3.IntegrityError:
+        print("video is already queued")
+
     conn.close()
 
 
@@ -114,11 +155,15 @@ def run_web_server():
     def index():
         return "Hello, World!"
 
-    @app.route('/requests', methods=['GET'])
+    @app.route('/api/requests', methods=['GET'])
     def get_requests():
         return jsonify(get_ydl_requests())
 
-    @app.route('/requests', methods=['POST'])
+    @app.route('/api/requests/<int:id>', methods=['GET'])
+    def get_request(id):
+        return jsonify(get_ydl_request(id))
+
+    @app.route('/api/requests', methods=['POST'])
     def add_request():
         content = request.json
         schedule = content.get('schedule', 0)
@@ -128,7 +173,7 @@ def run_web_server():
         resolver_thread.start()
         return jsonify(req), 201
 
-    @app.route('/items', methods=['GET'])
+    @app.route('/api/items', methods=['GET'])
     def get_items():
         return jsonify(get_ydl_items(3, 1))
 
@@ -167,6 +212,11 @@ def status_hook(d):
     else:
         print('pending')
 
+def isNowInTimePeriod(startTime, endTime, nowTime):
+    if startTime < endTime:
+        return startTime <= nowTime <= endTime
+    else: #Over midnight
+        return nowTime >= startTime or nowTime <= endTime
 
 def run_downloader():
 
@@ -182,7 +232,7 @@ def run_downloader():
 
     while True:
         time_now = datetime.datetime.now().time()
-        schedule = off_peak_start < time_now and time_now < off_peak_end
+        schedule = not isNowInTimePeriod(off_peak_start, off_peak_end, time_now)
         # false (0): offpeak
         # true  (1): anytime
 
