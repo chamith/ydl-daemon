@@ -6,12 +6,11 @@ import threading
 import sqlite3
 from flask import Flask, jsonify, request
 import os
-import time
 import datetime
-import daemon
+import time
+import sys
 
-DB_FILE = 'ydl-daemon.db'
-
+DB_FILE = sys.argv[1]
 
 def get_ydl_requests():
     conn = sqlite3.connect(DB_FILE)

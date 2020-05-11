@@ -1,12 +1,12 @@
-# Contents of /etc/systemd/system/ydl-daemon.service
+# Contents of /etc/systemd/system/SVC_NAME.service
 [Unit]
 Description=youtube-dl daemon
 After=network.target
 
 [Service]
 User=root
-WorkingDirectory=/var/lib/ydl-daemon
-ExecStart=/usr/local/bin/ydl-daemon.py
+WorkingDirectory=DL_DIR
+ExecStart=BIN_FILE_TARGET DB_FILE_TARGET
 SuccessExitStatus=143
 TimeoutStopSec=10
 Restart=on-failure
