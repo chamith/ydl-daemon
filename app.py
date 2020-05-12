@@ -12,13 +12,15 @@ import sys
 
 DB_FILE = sys.argv[1]
 
+
 def get_ydl_items(status, schedule):
 
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
     params = (status, schedule)
 
-    cur.execute("SELECT id, status, schedule FROM ydl_item WHERE status <= ? AND schedule <= ?", params)
+    cur.execute(
+        "SELECT id, status, schedule FROM ydl_item WHERE status <= ? AND schedule <= ?", params)
 
     rows = cur.fetchall()
 
@@ -34,26 +36,30 @@ def get_ydl_items(status, schedule):
 
     return items
 
+
 def get_ydl_items_by_request(request_id):
 
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
     params = (request_id,)
 
-    cur.execute("SELECT id, title, status, progress FROM ydl_item WHERE request_id = ?", params)
+    cur.execute(
+        "SELECT id, title, status, progress FROM ydl_item WHERE request_id = ?", params)
 
     rows = cur.fetchall()
 
     items = []
 
     for raw in rows:
-        item = {'id': raw[0], 'title': raw[1], 'status': raw[2], 'progress': raw[3]}
+        item = {'id': raw[0], 'title': raw[1],
+                'status': raw[2], 'progress': raw[3]}
         items.append(item)
 
     cur.close()
     conn.close()
 
     return items
+
 
 def get_ydl_requests():
     conn = sqlite3.connect(DB_FILE)
@@ -64,7 +70,8 @@ def get_ydl_requests():
     requests = []
 
     for raw in request_rows:
-        request = {'id': raw[2], 'url': raw[0], 'schedule': raw[1], 'items': get_ydl_items_by_request(raw[2])}
+        request = {'id': raw[2], 'url': raw[0], 'schedule': raw[1],
+                   'items': get_ydl_items_by_request(raw[2])}
         requests.append(request)
         print(request)
 
@@ -73,6 +80,7 @@ def get_ydl_requests():
 
     return requests
 
+
 def get_ydl_request(id):
     conn = sqlite3.connect(DB_FILE)
     params = (id,)
@@ -80,7 +88,8 @@ def get_ydl_request(id):
     cur.execute("SELECT url, schedule, id FROM ydl_request WHERE id = ?", params)
     raw = cur.fetchone()
 
-    request = {'url': raw[0], 'schedule': raw[1], 'items': get_ydl_items_by_request(raw[2])}
+    request = {'url': raw[0], 'schedule': raw[1],
+               'items': get_ydl_items_by_request(raw[2])}
     print(request)
 
     cur.close()
@@ -89,6 +98,13 @@ def get_ydl_request(id):
     return request
 
 
+def delete_ydl_request(id):
+    conn = sqlite3.connect(DB_FILE)
+    params = (id,)
+    conn.execute("DELETE FROM ydl_request WHERE id = ?", params)
+
+    conn.commit()
+    conn.close()
 
 def queue_video(video, request):
     print('{id:\'%s\', title:\'%s\'}' % (video['id'], video['title']))
@@ -163,6 +179,11 @@ def run_web_server():
     def get_request(id):
         return jsonify(get_ydl_request(id))
 
+    @app.route('/api/requests/<int:id>', methods=['DELETE'])
+    def delete_request(id):
+        delete_ydl_request(id)
+        return jsonify()
+
     @app.route('/api/requests', methods=['POST'])
     def add_request():
         content = request.json
@@ -216,11 +237,13 @@ def status_hook(d):
     else:
         print('pending')
 
+
 def isNowInTimePeriod(startTime, endTime, nowTime):
     if startTime < endTime:
         return startTime <= nowTime <= endTime
-    else: #Over midnight
+    else:  # Over midnight
         return nowTime >= startTime or nowTime <= endTime
+
 
 def run_downloader():
 
@@ -230,13 +253,14 @@ def run_downloader():
     off_peak_end = datetime.time(8, 0)
 
     print("===== CONFIGS =====")
-    print('Download Directory: %s' %(os.getcwd()))
-    print('Off Peak Schedule: %s - %s' %(off_peak_start , off_peak_end))
+    print('Download Directory: %s' % (os.getcwd()))
+    print('Off Peak Schedule: %s - %s' % (off_peak_start, off_peak_end))
     print('===================')
 
     while True:
         time_now = datetime.datetime.now().time()
-        schedule = not isNowInTimePeriod(off_peak_start, off_peak_end, time_now)
+        schedule = not isNowInTimePeriod(
+            off_peak_start, off_peak_end, time_now)
         # false (0): offpeak
         # true  (1): anytime
 
