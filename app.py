@@ -9,11 +9,59 @@ import os
 import datetime
 import time
 import sys
+import getopt
+from pathlib import Path
 
 YOUTUBE_VIDEO_ID_LENGTH = 11
+DEFAULT_CONFIG='youtube-dl-daemon.conf'
+DEFAULT_DB='youtube-dl-daemon.db'
+DEFAULT_DOWNLOAD_DIR = os.getcwd()
+DEFAULT_OFFPEAK_START = datetime.time(0, 0, 00)
+DEFAULT_OFFPEAK_END = datetime.time(11, 59, 59)
 
-DB_FILE = sys.argv[1]
+def get_opt_val(opts, key, key_long, default_value):
+    for opt in opts:
+        if opt[0] in (key, key_long):
+            return opt[1]
+    return default_value
 
+def get_config_settings():
+    config_settings = {}
+
+    if not os.path.isfile(CONFIG_FILE):
+        return config_settings
+
+    with open(CONFIG_FILE) as f_in:
+        lines = filter(None, ((not line.startswith('#') and line.rstrip()) for line in f_in))
+
+        for line in lines:
+            line = line.split('=')
+            config_settings[line[0]] = line[1]
+
+    return config_settings
+
+    
+def get_offpeak_time(configs, default_start_time, default_finish_time):
+    offpeak_from_config = configs.get('offpeak', None)
+    
+    if offpeak_from_config is None:
+        return default_start_time, default_finish_time
+
+    try:
+        time_array = offpeak_from_config.split('-')
+        return datetime.datetime.strptime(time_array[0],'%H:%M:%S').time(), datetime.datetime.strptime(time_array[1],'%H:%M:%S').time()
+    except:
+        return default_start_time, default_finish_time
+
+opts, args = getopt.getopt(sys.argv[1:], "d:c:",['database=', 'config='])
+
+DB_FILE = get_opt_val(opts, '-d','--database', DEFAULT_DB)
+CONFIG_FILE = get_opt_val(opts, '-c','--config', DEFAULT_CONFIG)
+
+print('Config File:{}'.format(CONFIG_FILE))
+print('DB File:{}'.format(DB_FILE))
+
+configs = get_config_settings()
 
 def get_ydl_items(status, schedule):
 
@@ -152,7 +200,6 @@ def resolve_items(request):
             print("###playlist###")
             queue_video_list(result['entries'], request)
 
-
 def queue_request(url, schedule):
     conn = sqlite3.connect(DB_FILE)
     print('Queuing the request url:%s, schedule:%d' % (url, schedule))
@@ -251,16 +298,15 @@ def isNowInTimePeriod(startTime, endTime, nowTime):
 
 def run_downloader():
 
-    from pathlib import Path
-    DOWNLOAD_DIR = os.getcwd()
+
 
     print("Starting the download server ...")
 
-    off_peak_start = datetime.time(0, 0)
-    off_peak_end = datetime.time(8, 0)
+    off_peak_start, off_peak_end = get_offpeak_time(configs, DEFAULT_OFFPEAK_START, DEFAULT_OFFPEAK_END)
+    download_dir = configs.get('download_directory', DEFAULT_DOWNLOAD_DIR)
 
     print("===== CONFIGS =====")
-    print('Download Directory: %s' % (DOWNLOAD_DIR))
+    print('Download Directory: %s' % (download_dir))
     print('Off Peak Schedule: %s - %s' % (off_peak_start, off_peak_end))
     print('===================')
 
@@ -278,7 +324,7 @@ def run_downloader():
         ydl_opts = {
             'format': 'best',
             'progress_hooks': [status_hook],
-            'outtmpl': DOWNLOAD_DIR + '/%(title)s-%(id)s.%(ext)s'
+            'outtmpl': download_dir + '/%(title)s-%(id)s.%(ext)s'
         }
 
         for item in items:
