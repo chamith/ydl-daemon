@@ -7,15 +7,10 @@ BIN_DIR=/usr/local/bin
 LIB_DIR=/var/lib/$SVC_NAME
 SVC_DIR=/etc/systemd/system
 DB_NAME=$SVC_NAME.db
+CONF_NAME=$SVC_NAME.conf
 BIN_FILE_TARGET=$BIN_DIR/$SVC_NAME
 DB_FILE_TARGET=$LIB_DIR/$DB_NAME
-
-if [ -z "$1" ]; then
-    echo "please specify the download directory"
-    exit 1
-fi
-
-DL_DIR=$1
+CONF_FILE_TARGET=$LIB_DIR/$CONF_NAME
 
 if [ -f "$BIN_FILE_TARGET" ]; then
     echo "removing existing binary files"
@@ -37,9 +32,8 @@ fi
 echo "creating the db"
 $SCRIPT_DIR/db_setup.py $LIB_DIR/$DB_NAME
 
-if [ ! -d "$DL_DIR" ]; then
-    mkdir $DL_DIR
-fi
+echo "copying the config file"
+cp $SCRIPT_DIR/$CONF_NAME $CONF_FILE_TARGET
 
 apt install python3-pip -y
 pip3 install -r $SCRIPT_DIR/requirements.txt
@@ -52,7 +46,7 @@ if [ -f "$SVC_DIR/$SVC_NAME.service" ]; then
 fi
 
 echo "installing the new service"
-cat $SCRIPT_DIR/service.tmpl | sed "s^SVC_NAME^$SVC_NAME^g" | sed "s^BIN_FILE_TARGET^$BIN_FILE_TARGET^g" | sed "s^DB_FILE_TARGET^$DB_FILE_TARGET^g"  | sed "s^DL_DIR^$DL_DIR^g"  > $SVC_DIR/$SVC_NAME.service
+cat $SCRIPT_DIR/service.tmpl | sed "s^SVC_NAME^$SVC_NAME^g" | sed "s^LIB_DIR^$LIB_DIR^g" | sed "s^BIN_FILE_TARGET^$BIN_FILE_TARGET^g" | sed "s^DB_FILE_TARGET^$DB_FILE_TARGET^g"  | sed "s^CONF_FILE_TARGET^$CONF_FILE_TARGET^g"  > $SVC_DIR/$SVC_NAME.service
 
 systemctl daemon-reload
 systemctl enable $SVC_NAME.service

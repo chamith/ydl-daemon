@@ -5,8 +5,8 @@ After=network.target
 
 [Service]
 User=root
-WorkingDirectory=DL_DIR
-ExecStart=BIN_FILE_TARGET DB_FILE_TARGET
+WorkingDirectory=LIB_DIR
+ExecStart=BIN_FILE_TARGET --database=DB_FILE_TARGET --config=CONF_FILE_TARGET
 SuccessExitStatus=143
 TimeoutStopSec=10
 Restart=on-failure
