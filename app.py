@@ -10,6 +10,8 @@ import datetime
 import time
 import sys
 
+YOUTUBE_VIDEO_ID_LENGTH = 11
+
 DB_FILE = sys.argv[1]
 
 
@@ -20,7 +22,7 @@ def get_ydl_items(status, schedule):
     params = (status, schedule)
 
     cur.execute(
-        "SELECT id, status, schedule FROM ydl_item WHERE status <= ? AND schedule <= ?", params)
+        "SELECT id, status, schedule FROM ydl_item WHERE status <= ? AND schedule >= ?", params)
 
     rows = cur.fetchall()
 
@@ -101,6 +103,8 @@ def get_ydl_request(id):
 def delete_ydl_request(id):
     conn = sqlite3.connect(DB_FILE)
     params = (id,)
+
+    conn.execute("DELETE FROM ydl_item WHERE request_id = ?", params)
     conn.execute("DELETE FROM ydl_request WHERE id = ?", params)
 
     conn.commit()
@@ -151,7 +155,7 @@ def resolve_items(request):
 
 def queue_request(url, schedule):
     conn = sqlite3.connect(DB_FILE)
-    print('url:%s, schedule:%d' % (url, schedule))
+    print('Queuing the request url:%s, schedule:%d' % (url, schedule))
     cur = conn.cursor()
     params = (url, schedule)
     cur.execute(
@@ -187,7 +191,7 @@ def run_web_server():
     @app.route('/api/requests', methods=['POST'])
     def add_request():
         content = request.json
-        schedule = content.get('schedule', 0)
+        schedule = int(content.get('schedule', 0))
         url = content.get('url', None)
 
         if url is None:
@@ -208,8 +212,8 @@ def run_web_server():
 
 def update_item_progress(filename, status, progress=0):
     filename_no_ext = os.path.splitext(filename)[0]
-    lst = filename_no_ext.split('-')
-    id = lst[len(lst)-1]
+    filename_length = len(filename_no_ext)
+    id = filename_no_ext[filename_length - YOUTUBE_VIDEO_ID_LENGTH : filename_length]
     conn = sqlite3.connect(DB_FILE)
     print('id:%s, status:%d, progress:%d' % (id, status, progress))
     cur = conn.cursor()
@@ -247,27 +251,34 @@ def isNowInTimePeriod(startTime, endTime, nowTime):
 
 def run_downloader():
 
+    from pathlib import Path
+    DOWNLOAD_DIR = os.getcwd()
+
     print("Starting the download server ...")
 
     off_peak_start = datetime.time(0, 0)
     off_peak_end = datetime.time(8, 0)
 
     print("===== CONFIGS =====")
-    print('Download Directory: %s' % (os.getcwd()))
+    print('Download Directory: %s' % (DOWNLOAD_DIR))
     print('Off Peak Schedule: %s - %s' % (off_peak_start, off_peak_end))
     print('===================')
 
     while True:
         time_now = datetime.datetime.now().time()
-        schedule = not isNowInTimePeriod(
+        is_off_peak = isNowInTimePeriod(
             off_peak_start, off_peak_end, time_now)
-        # false (0): offpeak
-        # true  (1): anytime
 
-        items = get_ydl_items(2, schedule)
+        schedule_text = 'Off Peak' if is_off_peak else 'Peak'
+
+        print('Current Schedule: {}'.format(schedule_text))
+
+        items = get_ydl_items(2, not is_off_peak)
 
         ydl_opts = {
-            'progress_hooks': [status_hook]
+            'format': 'best',
+            'progress_hooks': [status_hook],
+            'outtmpl': DOWNLOAD_DIR + '/%(title)s-%(id)s.%(ext)s'
         }
 
         for item in items:
