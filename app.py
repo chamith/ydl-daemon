@@ -1,7 +1,7 @@
 #! /usr/bin/python3
 
 from __future__ import unicode_literals
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 import youtube_dl
 import threading
 import sqlite3
@@ -234,11 +234,15 @@ def queue_request(url, schedule):
 
 def run_web_server():
 
-    app = Flask(__name__)
+    app = Flask(__name__, static_url_path='/web-ui')
 
     @app.route('/')
-    def index():
-        return "Hello, World!"
+    def root():
+        return send_from_directory('web-ui', 'index.html')
+
+    @app.route('/<path:path>')
+    def send_js(path):
+        return send_from_directory('web-ui', path)
 
     @app.route('/api/requests', methods=['GET'])
     def get_requests():
