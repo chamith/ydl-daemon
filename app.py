@@ -17,7 +17,7 @@ DEFAULT_CONFIG='youtube-dl-daemon.conf'
 DEFAULT_DB='youtube-dl-daemon.db'
 DEFAULT_DOWNLOAD_DIR = os.getcwd()
 DEFAULT_OFFPEAK_START = datetime.time(0, 0, 00)
-DEFAULT_OFFPEAK_END = datetime.time(11, 59, 59)
+DEFAULT_OFFPEAK_END = datetime.time(23, 59, 59)
 
 def get_opt_val(opts, key, key_long, default_value):
     for opt in opts:
@@ -158,6 +158,24 @@ def delete_ydl_request(id):
     conn.commit()
     conn.close()
 
+def delete_complete_requests():
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+
+    cur.execute('SELECT request_id FROM (SELECT request_id, avg(status) AS avg_status FROM ydl_item GROUP BY request_id) WHERE avg_status = 3')
+
+    raws = cur.fetchall()
+
+    cur.close()
+
+    for raw in raws:
+        params = (raw[0],)
+        conn.execute("DELETE FROM ydl_item WHERE request_id = ?", params)
+        conn.execute("DELETE FROM ydl_request WHERE id = ?", params)
+
+    conn.commit()
+    conn.close()
+
 def queue_video(video, request):
     print('{id:\'%s\', title:\'%s\'}' % (video['id'], video['title']))
 
@@ -235,6 +253,11 @@ def run_web_server():
         delete_ydl_request(id)
         return jsonify()
 
+    @app.route('/api/requests', methods=['DELETE'])
+    def clean_completed_requests():
+        delete_complete_requests()
+        return jsonify()
+
     @app.route('/api/requests', methods=['POST'])
     def add_request():
         content = request.json
@@ -273,7 +296,6 @@ def update_item_progress(filename, status, progress=0):
 
 def status_hook(d):
 
-    print('filename:%s, status:%s' % (d['filename'], d['status']))
     if d['status'] == 'downloading':
         progress = d['downloaded_bytes']/d['total_bytes']*100
         update_item_progress(d['filename'], 1, progress)
