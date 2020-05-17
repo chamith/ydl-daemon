@@ -2,6 +2,7 @@
 
 from __future__ import unicode_literals
 from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
 import youtube_dl
 import threading
 import sqlite3
@@ -120,8 +121,16 @@ def get_ydl_requests():
     requests = []
 
     for raw in request_rows:
+        items = get_ydl_items_by_request(raw[2])
+        sum, avg_pgr = 0, 0
+
+        for item in items:
+            sum += item['progress']
+
+        avg_pgr = sum / len(items)
+
         request = {'id': raw[2], 'url': raw[0], 'schedule': raw[1],
-                   'items': get_ydl_items_by_request(raw[2])}
+                   'items': items, 'progress': avg_pgr}
         requests.append(request)
         print(request)
 
@@ -235,6 +244,7 @@ def queue_request(url, schedule):
 def run_web_server():
 
     app = Flask(__name__, static_url_path='/web-ui')
+    CORS(app)
 
     @app.route('/')
     def root():
