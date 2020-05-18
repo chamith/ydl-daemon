@@ -127,7 +127,8 @@ def get_ydl_requests():
         for item in items:
             sum += item['progress']
 
-        avg_pgr = sum / len(items)
+        if len(items) > 0:
+            avg_pgr = sum / len(items)
 
         request = {'id': raw[2], 'url': raw[0], 'schedule': raw[1],
                    'items': items, 'progress': avg_pgr}
