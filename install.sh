@@ -3,14 +3,18 @@
 SVC_NAME=youtube-dl-daemon
 SRC_NAME=app.py
 SCRIPT_DIR=$(dirname "$0")
-BIN_DIR=/usr/local/bin
 LIB_DIR=/var/lib/$SVC_NAME
 SVC_DIR=/etc/systemd/system
 DB_NAME=$SVC_NAME.db
 CONF_NAME=$SVC_NAME.conf
-BIN_FILE_TARGET=$BIN_DIR/$SVC_NAME
+BIN_FILE_TARGET=$LIB_DIR/$SVC_NAME
 DB_FILE_TARGET=$LIB_DIR/$DB_NAME
 CONF_FILE_TARGET=$LIB_DIR/$CONF_NAME
+
+if [ ! -d "$LIB_DIR" ]; then
+    echo "creating the lib directory"
+    mkdir $LIB_DIR
+fi
 
 if [ -f "$BIN_FILE_TARGET" ]; then
     echo "removing existing binary files"
@@ -19,16 +23,17 @@ fi
 
 cp $SCRIPT_DIR/$SRC_NAME $BIN_FILE_TARGET
 
-if [ ! -d "$LIB_DIR" ]; then
-    echo "creating the lib directory"
-    mkdir $LIB_DIR
-fi
+
 
 if [ -f "$LIB_DIR/$DB_NAME" ]; then
     echo "removing the db"
     rm $LIB_DIR/$DB_NAME
 fi
 
+if [ -d "$LIB_DIR" ]; then
+    echo "copying the web ui files"
+    cp $SCRIPT_DIR/web-ui $LIB_DIR/ -r
+fi
 echo "creating the db"
 $SCRIPT_DIR/db_setup.py $LIB_DIR/$DB_NAME
 
