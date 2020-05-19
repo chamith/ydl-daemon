@@ -16,8 +16,8 @@ if [ -f "$SVC_DIR/$SVC_NAME.service" ]; then
     cp $SCRIPT_DIR/$SRC_NAME $BIN_FILE_TARGET
 
     echo "Updating the web ui files"
-    rm $LIB_DIR/web-ui/* -r
-    cp $SCRIPT_DIR/web-ui/* $LIB_DIR/web-ui/ -r
+    rm $LIB_DIR/web-ui -r
+    cp $SCRIPT_DIR/web-ui $LIB_DIR/ -r
 
     echo "Starting the service $SVC_NAME"
     systemctl start $SVC_NAME
