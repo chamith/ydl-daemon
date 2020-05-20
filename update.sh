@@ -7,6 +7,7 @@ LIB_DIR=/var/lib/$SVC_NAME
 SVC_DIR=/etc/systemd/system
 BIN_FILE_TARGET=$LIB_DIR/$SVC_NAME
 
+git pull origin master
 
 if [ -f "$SVC_DIR/$SVC_NAME.service" ]; then
     echo "Stopping the service $SVC_NAME"
