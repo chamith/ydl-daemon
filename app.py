@@ -12,6 +12,7 @@ import time
 import sys
 import getopt
 from pathlib import Path
+import re
 
 YOUTUBE_VIDEO_ID_LENGTH = 11
 DEFAULT_CONFIG='youtube-dl-daemon.conf'
@@ -71,16 +72,16 @@ def get_ydl_items(status, schedule):
     params = (status, schedule)
 
     cur.execute(
-        "SELECT id, status, schedule FROM ydl_item WHERE status <= ? AND schedule >= ?", params)
+        "SELECT i.id, i.status, i.schedule, i.title, i.uploader, r.type AS r_type, r.title AS r_title, r.uploader AS r_uploader FROM ydl_item i INNER JOIN ydl_request r ON i.request_id = r.id WHERE i.status <= ? AND i.schedule >= ?", params)
 
     rows = cur.fetchall()
 
     items = []
 
-    for raw in rows:
-        item = {'id': raw[0], 'status': raw[1], 'schedule': raw[2]}
+    for row in rows:
+        item = {'id': row[0], 'status': row[1], 'schedule': row[2], 'title': row[3], 'uploader': row[4], 'r_type': row[5], 'r_title': row[6], 'r_uploader': row[7]}
         items.append(item)
-        print(item)
+        print('item: \n\t', item)
 
     cur.close()
     conn.close()
@@ -95,15 +96,15 @@ def get_ydl_items_by_request(request_id):
     params = (request_id,)
 
     cur.execute(
-        "SELECT id, title, status, progress FROM ydl_item WHERE request_id = ?", params)
+        "SELECT id, title, status, progress, uploader FROM ydl_item WHERE request_id = ?", params)
 
     rows = cur.fetchall()
 
     items = []
 
-    for raw in rows:
-        item = {'id': raw[0], 'title': raw[1],
-                'status': raw[2], 'progress': raw[3]}
+    for row in rows:
+        item = {'id': row[0], 'title': row[1],
+                'status': row[2], 'progress': row[3], 'uploader': row[4]}
         items.append(item)
 
     cur.close()
@@ -147,11 +148,11 @@ def get_ydl_request(id):
     conn = sqlite3.connect(DB_FILE)
     params = (id,)
     cur = conn.cursor()
-    cur.execute("SELECT url, schedule, id FROM ydl_request WHERE id = ?", params)
-    raw = cur.fetchone()
+    cur.execute("SELECT url, schedule, id, type, title, uploader FROM ydl_request WHERE id = ?", params)
+    row = cur.fetchone()
 
-    request = {'url': raw[0], 'schedule': raw[1],
-               'items': get_ydl_items_by_request(raw[2])}
+    request = {'url': row[0], 'schedule': row[1], 'type': row[3], 'title': row[4], 'uploader': row[5],
+               'items': get_ydl_items_by_request(row[2])}
     print(request)
 
     cur.close()
@@ -191,14 +192,20 @@ def delete_complete_requests():
 def queue_video(video, request):
     print('{id:\'%s\', title:\'%s\'}' % (video['id'], video['title']))
 
+    print('Play List: %s' %(video['playlist']))
+
+    if video['playlist'] is not None:
+        print('Uploader: %s' %(video['playlist_uploader']))
+        print('Index in Playlist: %s' %(video['playlist_index']))
+
     conn = sqlite3.connect(DB_FILE)
     params = (video['id'], video['title'],
-              request['schedule'], 0, 0, request['id'])
+              request['schedule'], 0, 0, request['id'], video['uploader'])
 
     try:
         with conn:
             conn.execute(
-                "INSERT INTO ydl_item(id, title, schedule, status, progress, request_id) VALUES (?,?,?,?,?,?)", params)
+                "INSERT INTO ydl_item(id, title, schedule, status, progress, request_id, uploader) VALUES (?,?,?,?,?,?,?)", params)
             conn.commit()
     except sqlite3.IntegrityError:
         print("video is already queued")
@@ -221,12 +228,25 @@ def resolve_items(request):
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
 
         result = ydl.extract_info(request['url'], download=False)
+        _type = 'video' if (result.get('_type') is None) else result.get('_type')
 
-        if result.get('_type') is None:
+        print('title:', result['title'])
+        print('uploader:', result['uploader'])
+        print('type:', _type)
+    
+        conn = sqlite3.connect(DB_FILE)
+        cur = conn.cursor()
+        params = (result['title'], result['uploader'], _type, request['id'])
+        cur.execute(
+            "UPDATE ydl_request SET title=?, uploader=?, type=? WHERE id=?", params)
+        conn.commit()
+        conn.close()
+
+        if _type == 'video':
             print('###single video###')
             queue_video(result, request)
 
-        elif result.get('_type') == 'playlist':
+        elif _type == 'playlist':
             print("###playlist###")
             queue_video_list(result['entries'], request)
 
@@ -334,10 +354,10 @@ def isNowInTimePeriod(startTime, endTime, nowTime):
     else:  # Over midnight
         return nowTime >= startTime or nowTime <= endTime
 
+def clean_string(str):
+    return str.replace('/','_')
 
 def run_downloader():
-
-
 
     print("Starting the download server ...")
 
@@ -362,12 +382,17 @@ def run_downloader():
 
         ydl_opts = {
             'format': 'best',
-            'progress_hooks': [status_hook],
-            'outtmpl': download_dir + '/%(title)s-%(id)s.%(ext)s'
+            'progress_hooks': [status_hook]
         }
 
         for item in items:
             url = "https://www.youtube.com/watch?v=" + item['id']
+            dir_name = clean_string(item['r_uploader']) + ' - ' + clean_string(item['r_title'])
+
+            if item['r_type'] == 'video':
+                ydl_opts['outtmpl'] = download_dir + '/%(uploader)s - %(title)s - %(id)s.%(ext)s'
+            else:
+                ydl_opts['outtmpl'] = download_dir + '/' + dir_name + '/%(title)s - %(id)s.%(ext)s'
 
             with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
