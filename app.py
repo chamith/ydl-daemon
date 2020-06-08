@@ -88,6 +88,27 @@ def get_ydl_items(status, schedule):
 
     return items
 
+def get_next_ydl_items(status, schedule, count):
+
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    params = (status, schedule, count)
+
+    cur.execute(
+        "SELECT i.id, i.status, i.schedule, i.title, i.uploader, r.type AS r_type, r.title AS r_title, r.uploader AS r_uploader FROM ydl_item i INNER JOIN ydl_request r ON i.request_id = r.id WHERE i.status <= ? AND i.schedule >= ? LIMIT ?", params)
+
+    rows = cur.fetchall()
+
+    items = []
+
+    for row in rows:
+        item = {'id': row[0], 'status': row[1], 'schedule': row[2], 'title': row[3], 'uploader': row[4], 'r_type': row[5], 'r_title': row[6], 'r_uploader': row[7]}
+        items.append(item)
+
+    cur.close()
+    conn.close()
+
+    return items
 
 def get_ydl_items_by_request(request_id):
 
@@ -136,7 +157,7 @@ def get_ydl_requests():
         request = {'id': row[2], 'url': row[0], 'schedule': row[1], 'type': row[3], 'title': row[4], 'uploader': row[5],
                    'items': items,'status': avg_sts, 'progress': avg_pgr}
         requests.append(request)
-        print(request)
+        # print(request)
 
     cur.close()
     conn.close()
@@ -378,7 +399,7 @@ def run_downloader():
 
         print('Current Schedule: {}'.format(schedule_text))
 
-        items = get_ydl_items(2, not is_off_peak)
+        items = get_next_ydl_items(2, not is_off_peak, 1)
 
         ydl_opts = {
             'format': 'best',
@@ -387,17 +408,17 @@ def run_downloader():
 
         for item in items:
             url = "https://www.youtube.com/watch?v=" + item['id']
-            dir_name = clean_string(item['r_uploader']) + ' - ' + clean_string(item['r_title'])
 
             if item['r_type'] == 'video':
-                ydl_opts['outtmpl'] = download_dir + '/%(uploader)s - %(title)s - %(id)s.%(ext)s'
+                ydl_opts['outtmpl'] = download_dir + '/%(title)s [%(uploader)s]-%(id)s.%(ext)s'
             else:
+                dir_name = '{playlist} [{uploader}]'.format(uploader=clean_string(item['r_uploader']), playlist=clean_string(item['r_title']))
                 ydl_opts['outtmpl'] = download_dir + '/' + dir_name + '/%(title)s - %(id)s.%(ext)s'
 
             with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
 
-        time.sleep(60)
+        time.sleep(10)
 
 
 try:
