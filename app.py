@@ -116,13 +116,13 @@ def get_ydl_items_by_request(request_id):
 def get_ydl_requests():
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
-    cur.execute("SELECT url, schedule, id FROM ydl_request")
+    cur.execute("SELECT url, schedule, id, type, title, uploader FROM ydl_request")
     request_rows = cur.fetchall()
 
     requests = []
 
-    for raw in request_rows:
-        items = get_ydl_items_by_request(raw[2])
+    for row in request_rows:
+        items = get_ydl_items_by_request(row[2])
         sum_pgr, avg_pgr = 0, 0
         sum_sts, avg_sts = 0, 0
         for item in items:
@@ -133,7 +133,7 @@ def get_ydl_requests():
             avg_pgr = sum_pgr / len(items)
             avg_sts = sum_sts / len(items)
 
-        request = {'id': raw[2], 'url': raw[0], 'schedule': raw[1],
+        request = {'id': row[2], 'url': row[0], 'schedule': row[1], 'type': row[3], 'title': row[4], 'uploader': row[5],
                    'items': items,'status': avg_sts, 'progress': avg_pgr}
         requests.append(request)
         print(request)
@@ -177,12 +177,12 @@ def delete_complete_requests():
 
     cur.execute('SELECT request_id FROM (SELECT request_id, avg(status) AS avg_status FROM ydl_item GROUP BY request_id) WHERE avg_status = 3')
 
-    raws = cur.fetchall()
+    rows = cur.fetchall()
 
     cur.close()
 
-    for raw in raws:
-        params = (raw[0],)
+    for row in rows:
+        params = (row[0],)
         conn.execute("DELETE FROM ydl_item WHERE request_id = ?", params)
         conn.execute("DELETE FROM ydl_request WHERE id = ?", params)
 
