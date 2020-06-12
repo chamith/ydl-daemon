@@ -1,6 +1,6 @@
 #! /bin/bash
 
-SVC_NAME=youtube-dl-daemon
+SVC_NAME=doda
 SRC_NAME=app.py
 SCRIPT_DIR=$(dirname "$0")
 LIB_DIR=/var/lib/$SVC_NAME
@@ -22,8 +22,6 @@ if [ -f "$BIN_FILE_TARGET" ]; then
 fi
 
 cp $SCRIPT_DIR/$SRC_NAME $BIN_FILE_TARGET
-
-
 
 if [ -f "$LIB_DIR/$DB_NAME" ]; then
     echo "removing the db"
