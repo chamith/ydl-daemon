@@ -1,13 +1,13 @@
 #! /bin/bash
 
 SVC_NAME=doda
-SRC_NAME=app.py
+SVC_BIN_FILE_NAME=app.py
 SCRIPT_DIR=$(dirname "$0")
 LIB_DIR=/var/lib/$SVC_NAME
 SVC_DIR=/etc/systemd/system
 DB_NAME=$SVC_NAME.db
 CONF_NAME=$SVC_NAME.conf
-BIN_FILE_TARGET=$LIB_DIR/$SVC_NAME
+BIN_FILE_TARGET=$LIB_DIR/$SVC_BIN_FILE_NAME
 DB_FILE_TARGET=$LIB_DIR/$DB_NAME
 CONF_FILE_TARGET=$LIB_DIR/$CONF_NAME
 
@@ -16,12 +16,12 @@ if [ ! -d "$LIB_DIR" ]; then
     mkdir $LIB_DIR
 fi
 
-if [ -f "$BIN_FILE_TARGET" ]; then
-    echo "removing existing binary files"
-    rm $BIN_FILE_TARGET
-fi
 
-cp $SCRIPT_DIR/$SRC_NAME $BIN_FILE_TARGET
+echo "removing existing binary files"
+rm $LIB_DIR/*.py
+
+
+cp $SCRIPT_DIR/*.py $LIB_DIR/
 
 if [ -f "$LIB_DIR/$DB_NAME" ]; then
     echo "removing the db"
