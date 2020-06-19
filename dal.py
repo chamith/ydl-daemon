@@ -1,6 +1,7 @@
 
 import sqlite3
 import youtube_dl
+import os
 
 DB_FILE=None
 

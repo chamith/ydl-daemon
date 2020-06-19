@@ -1,11 +1,11 @@
 #! /bin/bash
 
-SVC_NAME=youtube-dl-daemon
+SVC_NAME=doda
 SRC_NAME=app.py
 SCRIPT_DIR=$(dirname "$0")
 LIB_DIR=/var/lib/$SVC_NAME
 SVC_DIR=/etc/systemd/system
-BIN_FILE_TARGET=$LIB_DIR/$SVC_NAME
+BIN_FILE_TARGET=$LIB_DIR/$SRC_NAME
 
 git pull origin master
 
@@ -14,7 +14,7 @@ if [ -f "$SVC_DIR/$SVC_NAME.service" ]; then
     systemctl stop $SVC_NAME
 
     echo "Updating the binaries"
-    cp $SCRIPT_DIR/$SRC_NAME $BIN_FILE_TARGET
+    cp $SCRIPT_DIR/*.py $LIB_DIR/
 
     echo "Updating the web ui files"
     rm $LIB_DIR/web-ui -r
