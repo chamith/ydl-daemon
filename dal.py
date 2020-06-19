@@ -3,6 +3,7 @@ import sqlite3
 import youtube_dl
 import os
 
+YOUTUBE_VIDEO_ID_LENGTH = 11
 DB_FILE=None
 
 def init(db_file):
