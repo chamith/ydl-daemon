@@ -14,7 +14,6 @@ from pathlib import Path
 import re
 import dal
 
-YOUTUBE_VIDEO_ID_LENGTH = 11
 DEFAULT_CONFIG='doda.conf'
 DEFAULT_DB='doda.db'
 DEFAULT_DOWNLOAD_DIR = os.getcwd()
