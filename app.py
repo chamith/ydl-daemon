@@ -113,6 +113,11 @@ def run_web_server():
     def get_items():
         return jsonify(dal.get_items(3, 1))
 
+    @app.route('/api/items/<string:id>', methods=['DELETE'])
+    def delete_item(id):
+        dal.delete_item(id)
+        return jsonify()
+        
     if __name__ == '__main__':
         app.run(host='0.0.0.0', debug=False)
 

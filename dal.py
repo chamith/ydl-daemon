@@ -33,6 +33,15 @@ def get_items(status, schedule):
 
     return items
 
+def delete_item(id):
+    conn = sqlite3.connect(DB_FILE)
+    params = (id,)
+
+    conn.execute("DELETE FROM item WHERE id = ?", params)
+
+    conn.commit()
+    conn.close()
+
 def get_next_items(status, schedule, count):
 
     conn = sqlite3.connect(DB_FILE)
